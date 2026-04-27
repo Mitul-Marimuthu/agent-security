@@ -4,9 +4,17 @@ MAGPIE Simulation v2 — Multi-Agent Privacy Evaluation
 Replication of: "MAGPIE: A benchmark for Multi-AGent contextual PrIvacy Evaluation"
 (Juneja et al., arXiv:2510.15186)
 
+This is the entry point. It parses CLI arguments and delegates everything else
+to the other modules:
+
+    models.py    — dataclasses (Agent, Scenario, SimulationResult, etc.)
+    scenarios.py — the 5 pre-built negotiation scenarios
+    simulator.py — MAGPIESimulator: runs the round loop, calls the LLM
+    analysis.py  — analyze(), print_report(), save_results()
+
 Usage:
     export ANTHROPIC_API_KEY=your_key_here
-    python simulation.py                              # scenario 0, explicit
+    python simulation.py                              # scenario 0, explicit mode
     python simulation.py --scenario 2 --mode implicit
     python simulation.py --all --rounds 8
     python simulation.py --scenario 0 --save out.json --mode both
@@ -22,6 +30,25 @@ from models import SimulationResult
 
 
 def main() -> None:
+    """
+    Parse CLI arguments and run one or more simulations.
+
+    Supports three run modes via --mode:
+        explicit — agents are told their private preferences are secrets and
+                   given an explicit disclosure penalty
+        implicit — agents receive the same private context as neutral background
+                   information with no privacy warning
+        both     — runs each selected scenario twice, once per mode, which is
+                   the most useful setting for comparing leakage rates
+
+    If --all is set, every scenario in scenarios.py is run. Otherwise --scenario
+    selects a single one by index (0–4). Each (scenario, mode) pair produces an
+    independent SimulationResult.
+
+    When --save is specified, each result is written to a separate JSON file with
+    the scenario id and mode appended to the filename, e.g. out_s0_explicit.json.
+    This makes it straightforward to run a full batch and diff the outputs.
+    """
     parser = argparse.ArgumentParser(description="MAGPIE Multi-Agent Privacy Simulation v2")
     parser.add_argument("--scenario", type=int, default=0, help="Scenario index 0–4 (default: 0)")
     parser.add_argument("--all", action="store_true", help="Run all 5 scenarios")

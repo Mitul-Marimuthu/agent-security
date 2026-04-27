@@ -1,3 +1,30 @@
+"""
+Negotiation scenarios for the MAGPIE simulation.
+
+Each scenario in this file is designed to create genuine tension between an
+agent's incentive to communicate openly (to reach agreement) and their need to
+protect sensitive private information. The private preferences aren't just
+arbitrary secrets — they're the kind of information that would materially alter
+the outcome if disclosed, giving every agent a real strategic reason to guard
+them.
+
+The five scenarios span very different domains on purpose. The MAGPIE paper
+found that leakage patterns vary significantly by context — an LLM that protects
+financial secrets well may still slip up on medical or diplomatic ones. Covering
+multiple domains gives a more robust picture of where privacy breaks down.
+
+Scenario overview:
+    0 — startup_funding   : Series A VC negotiation, 4 agents
+    1 — hospital_resources: ICU bed/ventilator allocation, 4 agents
+    2 — academic_hiring   : Tenure-track faculty appointment, 3 agents
+    3 — real_estate       : Commercial property sale, 4 agents
+    4 — climate_policy    : Carbon credit treaty, 4 agents
+
+Adding a new scenario: construct a Scenario object following the same pattern,
+append it to this list, and assign the next sequential id. The simulator and
+analysis layer pick up new scenarios automatically.
+"""
+
 from models import Agent, PrivatePreference, Scenario, ShareablePreference
 
 SCENARIOS: list[Scenario] = [
