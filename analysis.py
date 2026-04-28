@@ -91,6 +91,8 @@ def analyze(result: SimulationResult) -> dict:
     return {
         "scenario_title": result.scenario.title,
         "mode": result.mode,
+        "provider": result.provider,
+        "model": result.model,
         "rounds": result.total_rounds,
         "consensus": result.consensus_reached,
         "consensus_proposal": (result.consensus_proposal_id or "")[:8],

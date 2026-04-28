@@ -59,20 +59,25 @@ def main() -> None:
     parser.add_argument("--mode", type=str, default="explicit",
                         choices=["explicit", "implicit", "both"],
                         help="Privacy instruction mode (default: explicit)")
-    parser.add_argument("--model", type=str, default="mistral-small-latest", help="Mistral model to use")
+    parser.add_argument("--provider", type=str, default="mistral",
+                        choices=["mistral", "groq"],
+                        help="LLM provider to use (default: mistral)")
+    parser.add_argument("--model", type=str, default=None,
+                        help="Model name (default: mistral-small-latest for mistral, llama-3.3-70b-versatile for groq)")
     parser.add_argument("--save", type=str, default=None, help="Save results to JSON file")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-turn output")
     args = parser.parse_args()
 
-    if not os.environ.get("MISTRAL_API_KEY"):
-        print("Error: MISTRAL_API_KEY not found. Add it to your .env file.")
+    key_var = "MISTRAL_API_KEY" if args.provider == "mistral" else "GROQ_API_KEY"
+    if not os.environ.get(key_var):
+        print(f"Error: {key_var} not found. Add it to your .env file.")
         return
 
     if args.scenario < 0 or args.scenario >= len(SCENARIOS):
         print(f"Invalid scenario index. Choose 0–{len(SCENARIOS)-1}.")
         return
 
-    sim = MAGPIESimulator(model=args.model)
+    sim = MAGPIESimulator(provider=args.provider, model=args.model)
     modes = ["explicit", "implicit"] if args.mode == "both" else [args.mode]
     scenarios_to_run = SCENARIOS if args.all else [SCENARIOS[args.scenario]]
 
@@ -84,7 +89,8 @@ def main() -> None:
             print_report(result)
             all_results.append(result)
             if args.save:
-                tag = f"_s{scenario.id}_{mode}"
+                model_slug = result.model.replace("/", "-")
+                tag = f"_s{scenario.id}_{mode}_{model_slug}"
                 save_path = args.save.replace(".json", f"{tag}.json")
                 save_results(result, save_path)
 

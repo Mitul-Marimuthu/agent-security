@@ -21,64 +21,87 @@ import json
 import time
 import uuid
 from typing import Optional
-from mistralai.client import Mistral
-from mistralai.client.errors import SDKError
 
 from models import Agent, AgentState, LeakageRecord, Message, Proposal, Scenario, SimulationResult
+
+SUPPORTED_PROVIDERS = ("mistral", "groq")
+DEFAULT_MODELS = {
+    "mistral": "mistral-small-latest",
+    "groq": "llama-3.3-70b-versatile",
+}
 
 
 class MAGPIESimulator:
     """
     Runs multi-agent negotiation simulations and records privacy leakage.
 
-    Instantiate once and call run() for each (scenario, mode) combination you
-    want to evaluate. The same Mistral client is reused across all calls, which
-    is more efficient than creating a new one per run.
+    Supports two LLM providers — Mistral and Groq — switchable via the
+    'provider' argument. Instantiate once and call run() for each
+    (scenario, mode) combination you want to evaluate. The same client
+    is reused across all calls.
 
     Args:
-        api_key: Mistral API key. Falls back to the MISTRAL_API_KEY
-                 environment variable if not provided.
-        model:   The Mistral model to use for all three LLM roles (agent,
-                 leakage judge, task scorer). Defaults to mistral-small-latest.
+        provider: "mistral" or "groq". Determines which SDK and API key to use.
+        api_key:  Override the API key. Falls back to MISTRAL_API_KEY or
+                  GROQ_API_KEY in the environment, depending on provider.
+        model:    The model name to use for all three LLM roles (agent,
+                  leakage judge, task scorer). Defaults to the recommended
+                  model for the selected provider.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "mistral-small-latest"):
-        self.client = Mistral(api_key=api_key or os.environ.get("MISTRAL_API_KEY"))
-        self.model = model
+    def __init__(
+        self,
+        provider: str = "mistral",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
+        if provider not in SUPPORTED_PROVIDERS:
+            raise ValueError(f"provider must be one of {SUPPORTED_PROVIDERS}, got '{provider}'")
+
+        self.provider = provider
+        self.model = model or DEFAULT_MODELS[provider]
+
+        if provider == "mistral":
+            from mistralai.client import Mistral
+            self.client = Mistral(api_key=api_key or os.environ.get("MISTRAL_API_KEY"))
+        else:  # groq
+            from groq import Groq
+            self.client = Groq(api_key=api_key or os.environ.get("GROQ_API_KEY"))
 
     def _call(self, system: str, user: str, max_tokens: int = 600) -> str:
         """
-        Thin wrapper around the Mistral messages API with simple retry logic.
+        Unified LLM call with retry logic, normalised across providers.
 
-        Retries up to 3 times on rate limit errors using exponential backoff
-        (1s, 2s, 4s). All other exceptions are caught, printed, and return an
-        empty string so the caller can fall back gracefully rather than crashing
-        mid-simulation. Returning "" on failure means the JSON parser will
-        produce an empty dict, which in turn causes the agent to default to a
-        "pass" action — not ideal, but recoverable.
+        Mistral and Groq use slightly different method names but return the
+        same response shape (choices[0].message.content). Rate limit errors
+        (HTTP 429) are retried up to 3 times with exponential backoff. All
+        other errors print a warning and return "" so the caller can fall
+        back to a safe default ("pass" action) without crashing mid-simulation.
         """
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
         for attempt in range(3):
             try:
-                resp = self.client.chat.complete(
-                    model=self.model,
-                    max_tokens=max_tokens,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                )
+                if self.provider == "mistral":
+                    resp = self.client.chat.complete(
+                        model=self.model, max_tokens=max_tokens, messages=messages
+                    )
+                else:  # groq
+                    resp = self.client.chat.completions.create(
+                        model=self.model, max_tokens=max_tokens, messages=messages
+                    )
                 return resp.choices[0].message.content
-            except SDKError as e:
-                if e.status_code == 429:
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "rate_limit" in err.lower() or "rate limit" in err.lower():
                     wait = 2 ** attempt
                     print(f"  [rate limit] waiting {wait}s...")
                     time.sleep(wait)
                 else:
-                    print(f"  [api error {e.status_code}] {e}")
+                    print(f"  [api error] {e}")
                     return ""
-            except Exception as e:
-                print(f"  [api error] {e}")
-                return ""
         return ""
 
     def _parse_json(self, raw: str) -> dict:
@@ -500,7 +523,7 @@ Respond with:
             A SimulationResult with the complete record of the run, ready to
             pass to the analysis layer.
         """
-        result = SimulationResult(scenario=scenario, mode=mode)
+        result = SimulationResult(scenario=scenario, mode=mode, provider=self.provider, model=self.model)
         states: dict[str, AgentState] = {a.name: AgentState(name=a.name) for a in scenario.agents}
         messages: list[Message] = []
         proposals: list[Proposal] = []
@@ -527,12 +550,15 @@ Respond with:
 
                 # Persist memory note
                 note = action.get("memory_note")
-                if note:
+                if note and isinstance(note, str):
                     state.memory.append(f"[R{round_num}] {note}")
 
                 action_type = action.get("action", "pass")
-                content = action.get("content", "") or ""
+                raw_content = action.get("content", "") or ""
+                content = raw_content if isinstance(raw_content, str) else json.dumps(raw_content)
                 to = action.get("to") or []
+                if not isinstance(to, list):
+                    to = []
 
                 # ── Process action ──────────────────────────────────
                 if action_type == "send_message" and content:
@@ -563,13 +589,13 @@ Respond with:
                         print(f"  {content}")
 
                 elif action_type in ("accept_proposal", "reject_proposal"):
-                    pid_prefix = (action.get("proposal_id") or "").strip()
+                    pid_prefix = str(action.get("proposal_id") or "").strip()
                     matched = [p for p in proposals if p.id.startswith(pid_prefix) or p.short_id == pid_prefix]
                     if matched:
                         target = matched[-1]
                         decision = "accepted" if action_type == "accept_proposal" else "rejected"
                         state.proposal_status = (target.id, decision)
-                        reason = (action.get("reason") or "").strip()
+                        reason = str(action.get("reason") or "").strip()
                         suffix = f": {reason}" if reason else ""
                         recent_events.append(f"[R{round_num}] {agent.name} {decision} [{target.short_id}]{suffix}")
                         if verbose:

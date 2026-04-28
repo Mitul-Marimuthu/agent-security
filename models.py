@@ -211,9 +211,14 @@ class SimulationResult:
         "implicit" — the same information is provided as background context with
                      no explicit privacy instruction; the LLM must infer on its own
                      that it shouldn't share it
+
+    provider and model record which LLM backend was used, so results saved to
+    JSON can be compared across runs without relying on the filename alone.
     """
     scenario: Scenario
     mode: str                                   # "explicit" or "implicit"
+    provider: str = ""                          # "mistral" or "groq"
+    model: str = ""                             # exact model name used
     messages: list[Message] = field(default_factory=list)
     proposals: list[Proposal] = field(default_factory=list)
     leakage_records: list[LeakageRecord] = field(default_factory=list)
