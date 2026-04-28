@@ -2,3 +2,4 @@ mistralai
 python-dotenv
 streamlit
 pandas
+plotly

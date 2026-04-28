@@ -10,6 +10,15 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from metrics import (
+    build_runs_df, build_records_df,
+    chart_leakage_by_round, chart_rounds_to_first_leak,
+    chart_per_role_leakage, chart_per_item_leakage,
+    chart_leakage_by_action_type, chart_behavior_vs_leakage,
+    chart_model_mode_comparison, chart_explicit_delta,
+    chart_severity_split, chart_weighted_severity,
+    chart_privacy_utility_scatter, chart_consensus_task_leakage,
+)
 
 RESULTS_DIR = Path("results")
 
@@ -388,6 +397,85 @@ def page_compare(results):
             render_proposals(r_r.get("proposals", []))
 
 
+# ── metrics page ─────────────────────────────────────────────────────────────
+
+def page_metrics(results):
+    st.title("Metrics")
+    st.caption("Structured analysis following the MAGPIE metrics framework.")
+
+    runs_df    = build_runs_df(results)
+    records_df = build_records_df(results)
+
+    # ── A. Leakage Rate ──────────────────────────────────────────────────────
+    st.header("A — Leakage Rate")
+
+    st.subheader("A1 — Does leakage increase as negotiation pressure builds?")
+    st.caption("Each line is one model+mode combination. A rising curve means agents disclose more as rounds progress.")
+    st.plotly_chart(chart_leakage_by_round(records_df), use_container_width=True)
+
+    st.subheader("A1a — How many rounds before the first leak?")
+    st.caption("Higher bars = agents held out longer. Low values suggest immediate disclosure under minimal pressure.")
+    st.plotly_chart(chart_rounds_to_first_leak(records_df), use_container_width=True)
+
+    st.subheader("A2 — Which agent roles are most prone to leaking?")
+    st.caption("Pooled across all runs. Roles with high rates consistently fail to keep secrets regardless of scenario.")
+    st.plotly_chart(chart_per_role_leakage(records_df), use_container_width=True)
+
+    st.subheader("A3 — Which private items are hardest to conceal?")
+    st.caption("Stacked by severity. Long bars = item leaks often. Mostly orange = hinting; mostly red = full disclosure.")
+    st.plotly_chart(chart_per_item_leakage(records_df), use_container_width=True)
+
+    st.subheader("A4 — Leakage by action type")
+    st.caption("Does leakage happen more in free-form messages, formal proposals, or accept/reject reasons?")
+    st.plotly_chart(chart_leakage_by_action_type(records_df), use_container_width=True)
+
+    st.subheader("A5 — Does behavior predict leakage in the same turn?")
+    st.caption("Fraction of turns per behavior type where at least one item leaked. Tests whether manipulation/power-seeking co-occurs with disclosure.")
+    st.plotly_chart(chart_behavior_vs_leakage(records_df), use_container_width=True)
+
+    st.divider()
+
+    # ── B. Mode / Model Comparison ───────────────────────────────────────────
+    st.header("B — Mode and Model Comparison")
+
+    st.subheader("B1 — Leakage rate across the 2×2: model × mode × scenario")
+    st.caption("Hold mode fixed to compare models; hold model fixed to compare modes. The full picture in one chart.")
+    st.plotly_chart(chart_model_mode_comparison(runs_df), use_container_width=True)
+
+    st.subheader("B2 — How much did the explicit warning actually reduce leakage?")
+    st.caption("Bars above zero = explicit framing helped. Near-zero or negative bars = the model ignores privacy instructions under social pressure.")
+    st.plotly_chart(chart_explicit_delta(runs_df), use_container_width=True)
+
+    st.divider()
+
+    # ── C. Severity ──────────────────────────────────────────────────────────
+    st.header("C — Weighted Severity")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Full vs partial split")
+        st.caption("A model that mostly hints (orange) is different from one that fully discloses (red), even at the same leakage rate.")
+        st.plotly_chart(chart_severity_split(records_df), use_container_width=True)
+    with c2:
+        st.subheader("Raw rate vs weighted score (partial=0.5, full=1.0)")
+        st.caption("If weighted score >> raw rate, most leaks are full disclosures. Weighted score captures severity, raw rate captures frequency.")
+        st.plotly_chart(chart_weighted_severity(runs_df, records_df), use_container_width=True)
+
+    st.divider()
+
+    # ── D. Privacy vs Utility ────────────────────────────────────────────────
+    st.header("D — Privacy vs Utility")
+    st.caption("The core tension in the benchmark. Ideal runs cluster top-left (low leakage, high task score). Hover a dot for run details.")
+    st.plotly_chart(chart_privacy_utility_scatter(runs_df), use_container_width=True)
+
+    st.divider()
+
+    # ── E. Consensus / Task / Leakage ────────────────────────────────────────
+    st.header("E — Consensus Rate, Task Score, and Leakage Rate")
+    st.caption("Three headline outcomes per model+mode. A good model has high green and blue bars with a low red bar.")
+    st.plotly_chart(chart_consensus_task_leakage(runs_df), use_container_width=True)
+
+
 # ── entry point ───────────────────────────────────────────────────────────────
 
 def main():
@@ -408,7 +496,7 @@ def main():
         st.markdown("### MAGPIE Viewer")
         st.caption("Multi-Agent Privacy Evaluation")
         st.divider()
-        page = st.radio("Navigate", ["Overview", "Detail", "Compare"])
+        page = st.radio("Navigate", ["Overview", "Detail", "Compare", "Metrics"])
         st.divider()
         st.caption(f"{len(results)} result files loaded")
 
@@ -416,8 +504,10 @@ def main():
         page_overview(results)
     elif page == "Detail":
         page_detail(results)
-    else:
+    elif page == "Compare":
         page_compare(results)
+    else:
+        page_metrics(results)
 
 
 if __name__ == "__main__":
