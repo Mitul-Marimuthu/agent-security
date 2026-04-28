@@ -13,7 +13,7 @@ to the other modules:
     analysis.py  — analyze(), print_report(), save_results()
 
 Usage:
-    export ANTHROPIC_API_KEY=your_key_here
+    # API key is loaded automatically from .env
     python simulation.py                              # scenario 0, explicit mode
     python simulation.py --scenario 2 --mode implicit
     python simulation.py --all --rounds 8
@@ -22,6 +22,9 @@ Usage:
 
 import os
 import argparse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from simulator import MAGPIESimulator
 from scenarios import SCENARIOS
@@ -56,13 +59,13 @@ def main() -> None:
     parser.add_argument("--mode", type=str, default="explicit",
                         choices=["explicit", "implicit", "both"],
                         help="Privacy instruction mode (default: explicit)")
-    parser.add_argument("--model", type=str, default="claude-sonnet-4-6", help="Claude model to use")
+    parser.add_argument("--model", type=str, default="mistral-small-latest", help="Mistral model to use")
     parser.add_argument("--save", type=str, default=None, help="Save results to JSON file")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-turn output")
     args = parser.parse_args()
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Error: set ANTHROPIC_API_KEY environment variable.")
+    if not os.environ.get("MISTRAL_API_KEY"):
+        print("Error: MISTRAL_API_KEY not found. Add it to your .env file.")
         return
 
     if args.scenario < 0 or args.scenario >= len(SCENARIOS):

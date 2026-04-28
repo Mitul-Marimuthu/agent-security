@@ -21,7 +21,8 @@ import json
 import time
 import uuid
 from typing import Optional
-import anthropic
+from mistralai.client import Mistral
+from mistralai.client.errors import SDKError
 
 from models import Agent, AgentState, LeakageRecord, Message, Proposal, Scenario, SimulationResult
 
@@ -41,8 +42,8 @@ class MAGPIESimulator:
                  leakage judge, task scorer). Defaults to claude-sonnet-4-6.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-6"):
-        self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
+    def __init__(self, api_key: Optional[str] = None, model: str = "mistral-small-latest"):
+        self.client = Mistral(api_key=api_key or os.environ.get("MISTRAL_API_KEY"))
         self.model = model
 
     def _call(self, system: str, user: str, max_tokens: int = 600) -> str:
@@ -58,17 +59,23 @@ class MAGPIESimulator:
         """
         for attempt in range(3):
             try:
-                resp = self.client.messages.create(
+                resp = self.client.chat.complete(
                     model=self.model,
                     max_tokens=max_tokens,
-                    system=system,
-                    messages=[{"role": "user", "content": user}],
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
                 )
-                return resp.content[0].text
-            except anthropic.RateLimitError:
-                wait = 2 ** attempt
-                print(f"  [rate limit] waiting {wait}s...")
-                time.sleep(wait)
+                return resp.choices[0].message.content
+            except SDKError as e:
+                if e.status_code == 429:
+                    wait = 2 ** attempt
+                    print(f"  [rate limit] waiting {wait}s...")
+                    time.sleep(wait)
+                else:
+                    print(f"  [api error {e.status_code}] {e}")
+                    return ""
             except Exception as e:
                 print(f"  [api error] {e}")
                 return ""
