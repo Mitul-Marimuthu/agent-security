@@ -24,49 +24,33 @@ from typing import Optional
 
 from models import Agent, AgentState, LeakageRecord, Message, Proposal, Scenario, SimulationResult
 
-SUPPORTED_PROVIDERS = ("mistral", "groq")
-DEFAULT_MODELS = {
-    "mistral": "mistral-small-latest",
-    "groq": "llama-3.3-70b-versatile",
-}
+DEFAULT_MODEL = "mistral-small-latest"
 
 
 class MAGPIESimulator:
     """
     Runs multi-agent negotiation simulations and records privacy leakage.
 
-    Supports two LLM providers — Mistral and Groq — switchable via the
-    'provider' argument. Instantiate once and call run() for each
-    (scenario, mode) combination you want to evaluate. The same client
-    is reused across all calls.
+    Uses the Mistral API for all LLM calls. Instantiate once and call run()
+    for each (scenario, mode) combination you want to evaluate. The same
+    client is reused across all calls.
 
     Args:
-        provider: "mistral" or "groq". Determines which SDK and API key to use.
-        api_key:  Override the API key. Falls back to MISTRAL_API_KEY or
-                  GROQ_API_KEY in the environment, depending on provider.
-        model:    The model name to use for all three LLM roles (agent,
-                  leakage judge, task scorer). Defaults to the recommended
-                  model for the selected provider.
+        api_key: Override the API key. Falls back to MISTRAL_API_KEY in the
+                 environment.
+        model:   The model name to use for all three LLM roles (agent,
+                 leakage judge, task scorer). Defaults to mistral-small-latest.
     """
 
     def __init__(
         self,
-        provider: str = "mistral",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
     ):
-        if provider not in SUPPORTED_PROVIDERS:
-            raise ValueError(f"provider must be one of {SUPPORTED_PROVIDERS}, got '{provider}'")
-
-        self.provider = provider
-        self.model = model or DEFAULT_MODELS[provider]
-
-        if provider == "mistral":
-            from mistralai.client import Mistral
-            self.client = Mistral(api_key=api_key or os.environ.get("MISTRAL_API_KEY"))
-        else:  # groq
-            from groq import Groq
-            self.client = Groq(api_key=api_key or os.environ.get("GROQ_API_KEY"))
+        from mistralai.client import Mistral
+        self.provider = "mistral"
+        self.model = model or DEFAULT_MODEL
+        self.client = Mistral(api_key=api_key or os.environ.get("MISTRAL_API_KEY"))
 
     def _call(self, system: str, user: str, max_tokens: int = 600) -> str:
         """
@@ -84,14 +68,9 @@ class MAGPIESimulator:
         ]
         for attempt in range(3):
             try:
-                if self.provider == "mistral":
-                    resp = self.client.chat.complete(
-                        model=self.model, max_tokens=max_tokens, messages=messages
-                    )
-                else:  # groq
-                    resp = self.client.chat.completions.create(
-                        model=self.model, max_tokens=max_tokens, messages=messages
-                    )
+                resp = self.client.chat.complete(
+                    model=self.model, max_tokens=max_tokens, messages=messages
+                )
                 return resp.choices[0].message.content
             except Exception as e:
                 err = str(e)
