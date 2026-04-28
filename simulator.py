@@ -32,14 +32,14 @@ class MAGPIESimulator:
     Runs multi-agent negotiation simulations and records privacy leakage.
 
     Instantiate once and call run() for each (scenario, mode) combination you
-    want to evaluate. The same Anthropic client is reused across all calls, which
+    want to evaluate. The same Mistral client is reused across all calls, which
     is more efficient than creating a new one per run.
 
     Args:
-        api_key: Anthropic API key. Falls back to the ANTHROPIC_API_KEY
+        api_key: Mistral API key. Falls back to the MISTRAL_API_KEY
                  environment variable if not provided.
-        model:   The Claude model to use for all three LLM roles (agent,
-                 leakage judge, task scorer). Defaults to claude-sonnet-4-6.
+        model:   The Mistral model to use for all three LLM roles (agent,
+                 leakage judge, task scorer). Defaults to mistral-small-latest.
     """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "mistral-small-latest"):
@@ -48,7 +48,7 @@ class MAGPIESimulator:
 
     def _call(self, system: str, user: str, max_tokens: int = 600) -> str:
         """
-        Thin wrapper around the Anthropic messages API with simple retry logic.
+        Thin wrapper around the Mistral messages API with simple retry logic.
 
         Retries up to 3 times on rate limit errors using exponential backoff
         (1s, 2s, 4s). All other exceptions are caught, printed, and return an
