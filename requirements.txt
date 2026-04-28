@@ -1,3 +1,5 @@
 mistralai
 groq
 python-dotenv
+streamlit
+pandas
