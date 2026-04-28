@@ -54,7 +54,7 @@ python simulation.py [options]
 | `--mode MODE` | `explicit` | Privacy framing: `explicit`, `implicit`, or `both` |
 | `--rounds N` | `6` | Maximum negotiation rounds per run |
 | `--model MODEL` | `mistral-small-latest` | Any Mistral model name |
-| `--save FILE` | off | Save full results to JSON (see below) |
+| `--save FILE` | `results/results.json` | Save full results to JSON (see below) |
 | `--quiet` | off | Suppress per-turn output; only print the final report |
 
 **Examples**
@@ -145,12 +145,12 @@ When `--all` is used, a cross-scenario summary table is printed at the end.
 
 ## Saving results to JSON
 
-Pass `--save results.json` to write a full record of every run. When multiple scenarios or modes are run, each produces its own file with the scenario id and mode appended:
+Results are saved to the `results/` folder by default. Each run produces its own file with the scenario id, mode, and model name appended:
 
 ```
-results_s0_explicit.json
-results_s0_implicit.json
-results_s1_explicit.json
+results/results_s0_explicit_mistral-small-latest.json
+results/results_s0_implicit_llama-3.3-70b-versatile.json
+results/results_s1_explicit_mistral-small-latest.json
 ...
 ```
 

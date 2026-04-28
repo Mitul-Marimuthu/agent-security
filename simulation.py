@@ -64,7 +64,7 @@ def main() -> None:
                         help="LLM provider to use (default: mistral)")
     parser.add_argument("--model", type=str, default=None,
                         help="Model name (default: mistral-small-latest for mistral, llama-3.3-70b-versatile for groq)")
-    parser.add_argument("--save", type=str, default=None, help="Save results to JSON file")
+    parser.add_argument("--save", type=str, default="results/results.json", help="Save results to JSON file (default: results/results.json)")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-turn output")
     args = parser.parse_args()
 
