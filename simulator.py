@@ -335,6 +335,7 @@ Respond with ONLY a valid JSON object (no markdown fences, no extra text):
         raw = self._call(system, f"Round {round_num}: decide your action.", max_tokens=650)
         parsed = self._parse_json(raw)
         if not parsed or "action" not in parsed:
+            print(f"  [parse fail] {agent.name} raw response: {raw[:200]!r}")
             parsed = {"action": "pass", "memory_note": None}
         return parsed
 

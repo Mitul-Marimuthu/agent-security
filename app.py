@@ -82,15 +82,23 @@ def render_conversation(conversation, leakage_records, compact=False):
             except Exception:
                 pass
             pid = entry.get("id", "")[:8]
-            st.markdown(
-                f'<div style="border-left:4px solid #7c3aed; background:#f5f3ff; '
-                f'padding:8px 12px; margin:6px 0; border-radius:4px">'
-                f'<div style="font-size:0.8em; color:#7c3aed; font-weight:600">'
-                f'📋 PROPOSAL [{pid}] — Round {rnd} — {sender}</div>'
-                f'<pre style="margin:4px 0; font-size:0.83em; white-space:pre-wrap">{content}</pre>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+            if compact:
+                with st.expander(f"[R{rnd}] 📋 PROPOSAL [{pid}] — {sender}"):
+                    st.markdown(
+                        f'<div style="font-family:monospace; font-size:0.85em; '
+                        f'white-space:pre-wrap; color:inherit">{content}</div>',
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.markdown(
+                    f'<div style="border-left:4px solid #7c3aed; background:#f5f3ff; '
+                    f'padding:8px 12px; margin:6px 0; border-radius:4px">'
+                    f'<div style="font-size:0.8em; color:#7c3aed; font-weight:600">'
+                    f'📋 PROPOSAL [{pid}] — Round {rnd} — {sender}</div>'
+                    f'<div style="margin:4px 0; font-size:0.83em; white-space:pre-wrap; font-family:monospace; color:#111">{content}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
             continue
 
         # regular message
@@ -114,25 +122,29 @@ def render_conversation(conversation, leakage_records, compact=False):
                     badges.append(badge(f"{LEAK_EMOJI[level]} {item}: {level}", color))
 
         badge_html = ("&nbsp;&nbsp;" + " ".join(badges)) if badges else ""
-
         text = entry["content"]
-        if compact and len(text) > 220:
-            text = text[:220] + "…"
 
-        border = "#f87171" if has_leak else "#e5e7eb"
-        bg     = "#fff5f5" if has_leak else "#ffffff"
-
-        st.markdown(
-            f'<div style="border:1px solid {border}; background:{bg}; '
-            f'padding:8px 12px; margin:4px 0; border-radius:6px">'
-            f'<div style="font-size:0.82em; margin-bottom:4px">'
-            f'<strong>{sender}</strong> '
-            f'<span style="color:#888">→ {to_str} &nbsp;·&nbsp; Round {rnd}</span>'
-            f'{badge_html}</div>'
-            f'<div style="font-size:0.9em; color:#111">{text}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+        if compact:
+            leak_flag = " ⚠️" if has_leak else ""
+            label = f"[R{rnd}] {sender} → {to_str}{leak_flag}"
+            with st.expander(label):
+                if badge_html:
+                    st.markdown(badge_html, unsafe_allow_html=True)
+                st.write(text)
+        else:
+            border = "#f87171" if has_leak else "#e5e7eb"
+            bg     = "#fff5f5" if has_leak else "#ffffff"
+            st.markdown(
+                f'<div style="border:1px solid {border}; background:{bg}; '
+                f'padding:8px 12px; margin:4px 0; border-radius:6px">'
+                f'<div style="font-size:0.82em; margin-bottom:4px">'
+                f'<strong>{sender}</strong> '
+                f'<span style="color:#888">→ {to_str} &nbsp;·&nbsp; Round {rnd}</span>'
+                f'{badge_html}</div>'
+                f'<div style="font-size:0.9em; color:#111">{text}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # ── privacy table ────────────────────────────────────────────────────────────
@@ -262,10 +274,10 @@ def page_overview(results):
         hide_index=True,
         column_config={
             "Task Score": st.column_config.ProgressColumn(
-                format="%.0f%%", min_value=0, max_value=1,
+                format="%.2f", min_value=0, max_value=1,
             ),
             "Leakage Rate": st.column_config.ProgressColumn(
-                format="%.0f%%", min_value=0, max_value=1,
+                format="%.2f", min_value=0, max_value=1,
             ),
         },
     )
