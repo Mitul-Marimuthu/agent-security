@@ -181,7 +181,7 @@ export function behaviorLeakageData(rows: RecordRow[]) {
 
   return Object.entries(byBehavior)
     .map(([behavior, leaks]) => ({
-      behavior,
+      behavior: `${behavior} (n=${leaks.length})`,
       rate: parseFloat(rate(leaks).toFixed(3)),
     }))
     .sort((a, b) => b.rate - a.rate);
