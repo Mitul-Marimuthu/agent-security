@@ -96,7 +96,7 @@ class AgentState:
     proposal_status: Optional[tuple[str, str]] = None       # (full_uuid, "accepted"|"rejected")
     received_proposal_ids: list[str] = field(default_factory=list)
 
-
+# dummy comment
 @dataclass
 class Message:
     """
